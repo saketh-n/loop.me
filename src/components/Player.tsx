@@ -6,6 +6,7 @@ import { RigidBody } from '@react-three/rapier';
 
 const MOVEMENT_SPEED = 8; // Increased speed for better responsiveness
 const CAMERA_ROTATION_SPEED = 0.03;
+const MAX_VERTICAL_ROTATION = Math.PI * 0.45; // Increased to ~81 degrees
 
 // World boundaries
 const WORLD_HEIGHT = 100;
@@ -51,11 +52,11 @@ export function Player() {
     const isUpPressed = keysPressed.current['ArrowUp'];
     const isDownPressed = keysPressed.current['ArrowDown'];
 
-    // Update camera rotation
+    // Update camera rotation with increased limits
     if (isLeftPressed) cameraRotation.current.y += CAMERA_ROTATION_SPEED;
     if (isRightPressed) cameraRotation.current.y -= CAMERA_ROTATION_SPEED;
-    if (isUpPressed) cameraRotation.current.x = Math.max(cameraRotation.current.x - CAMERA_ROTATION_SPEED, -Math.PI / 3);
-    if (isDownPressed) cameraRotation.current.x = Math.min(cameraRotation.current.x + CAMERA_ROTATION_SPEED, Math.PI / 3);
+    if (isUpPressed) cameraRotation.current.x = Math.max(cameraRotation.current.x - CAMERA_ROTATION_SPEED, -MAX_VERTICAL_ROTATION);
+    if (isDownPressed) cameraRotation.current.x = Math.min(cameraRotation.current.x + CAMERA_ROTATION_SPEED, MAX_VERTICAL_ROTATION);
 
     // Calculate movement direction
     velocity.current.set(0, 0, 0);
@@ -112,26 +113,37 @@ export function Player() {
     // Update position in store
     setPosition([worldPosition.x, worldPosition.y, worldPosition.z]);
 
-    // Update camera position with smooth transition through the loop
-    const cameraDistance = 8;
-    const cameraHeight = 5;
+    // Update camera position with dynamic adjustments
+    const verticalRotation = cameraRotation.current.x;
+    
+    // Adjust camera distance and height based on vertical rotation
+    const baseDistance = 8;
+    const baseHeight = 5;
+    
+    // Dynamic camera adjustments
+    const rotationFactor = Math.abs(verticalRotation) / MAX_VERTICAL_ROTATION;
+    const cameraDistance = baseDistance * (1 + rotationFactor * 0.5); // Increase distance when looking up/down
+    const cameraHeight = baseHeight * (1 - rotationFactor * 0.5); // Decrease height when looking up/down
+
     let adjustedY = worldPosition.y;
     
-    // Adjust camera when near world boundaries to prevent sudden jumps
+    // Adjust camera when near world boundaries
     if (worldPosition.y <= WORLD_BOTTOM + 10) {
-      // Blend between bottom and top positions
       const blend = (worldPosition.y - WORLD_BOTTOM) / 10;
       adjustedY = blend * worldPosition.y + (1 - blend) * (WORLD_HEIGHT - 10);
     } else if (worldPosition.y >= WORLD_HEIGHT - 10) {
-      // Blend between top and bottom positions
       const blend = (WORLD_HEIGHT - worldPosition.y) / 10;
       adjustedY = blend * worldPosition.y + (1 - blend) * (WORLD_BOTTOM + 10);
     }
 
+    // Update camera position with dynamic adjustments
     state.camera.position.x = worldPosition.x - Math.sin(rotation) * cameraDistance;
-    state.camera.position.y = adjustedY + cameraHeight + Math.sin(cameraRotation.current.x) * cameraDistance;
+    state.camera.position.y = adjustedY + cameraHeight + Math.sin(verticalRotation) * cameraDistance * 1.5;
     state.camera.position.z = worldPosition.z - Math.cos(rotation) * cameraDistance;
-    state.camera.lookAt(worldPosition.x, worldPosition.y + 1, worldPosition.z);
+    
+    // Adjust lookAt target based on vertical rotation
+    const lookAtHeight = verticalRotation < 0 ? 2 : 0; // Look higher when looking up
+    state.camera.lookAt(worldPosition.x, worldPosition.y + lookAtHeight, worldPosition.z);
   });
 
   return (

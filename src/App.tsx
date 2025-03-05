@@ -10,7 +10,7 @@ function App() {
           position: [0, 5, 8], 
           fov: 90,  // Wider field of view
           near: 0.1,
-          far: 200  // Increased far plane distance
+          far: 1000  // Increased far plane distance significantly
         }}
         style={{ background: 'skyblue' }}
       >

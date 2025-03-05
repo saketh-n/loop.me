@@ -1,4 +1,5 @@
 import { Physics, RigidBody } from '@react-three/rapier';
+import { DoubleSide } from 'three';
 import { Player } from './Player';
 
 // World boundaries
@@ -12,25 +13,34 @@ export function GameScene() {
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
 
-      {/* Main Platform */}
+      {/* Main Platform (Physical) */}
       <RigidBody type="fixed" colliders="trimesh">
         <mesh position={[0, PLATFORM_HEIGHT, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[20, 20]} />
-          <meshStandardMaterial color="green" />
+          <meshStandardMaterial color="#808080" side={DoubleSide} />
         </mesh>
       </RigidBody>
 
-      {/* Mirror Platform Above */}
-      <mesh position={[0, PLATFORM_HEIGHT + WORLD_OFFSET, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 20]} />
-        <meshStandardMaterial color="green" />
-      </mesh>
+      {/* Visual Mirror Platforms */}
+      <group>
+        {/* Platform Above */}
+        <mesh 
+          position={[0, PLATFORM_HEIGHT + WORLD_OFFSET, 0]} 
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[20, 20]} />
+          <meshStandardMaterial color="#808080" side={DoubleSide} />
+        </mesh>
 
-      {/* Mirror Platform Below */}
-      <mesh position={[0, PLATFORM_HEIGHT - WORLD_OFFSET, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 20]} />
-        <meshStandardMaterial color="green" />
-      </mesh>
+        {/* Platform Below */}
+        <mesh 
+          position={[0, PLATFORM_HEIGHT - WORLD_OFFSET, 0]} 
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[20, 20]} />
+          <meshStandardMaterial color="#808080" side={DoubleSide} />
+        </mesh>
+      </group>
 
       {/* Player */}
       <Player />
