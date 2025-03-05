@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useRef, useEffect } from 'react';
 import { Vector3, Euler } from 'three';
 import { useGameStore } from '../store/gameStore';
-import { RigidBody } from '@react-three/rapier';
+import { RigidBody, CuboidCollider } from '@react-three/rapier';
 
 const MOVEMENT_SPEED = 8; // Increased speed for better responsiveness
 const CAMERA_ROTATION_SPEED = 0.03;
@@ -19,7 +19,8 @@ export function Player() {
   const velocity = useRef(new Vector3());
   const cameraRotation = useRef(new Euler(0, 0, 0));
   const keysPressed = useRef<{ [key: string]: boolean }>({});
-  const { position, setPosition } = useGameStore();
+  const prevVelocity = useRef<number>(0);
+  const { position, setPosition, takeDamage, isGameComplete } = useGameStore();
   
   // Set up keyboard controls
   useEffect(() => {
@@ -43,6 +44,30 @@ export function Player() {
   useFrame((state, delta) => {
     if (!rigidBodyRef.current) return;
 
+    const worldPosition = rigidBodyRef.current.translation();
+    const currentVel = rigidBodyRef.current.linvel();
+
+    // Check for sudden velocity changes (impacts)
+    const currentVerticalVel = currentVel.y;
+    if (!isGameComplete && prevVelocity.current < -10 && Math.abs(currentVerticalVel) < 1) {
+      // We had a high negative velocity that suddenly became ~0
+      // This means we hit something! Calculate damage based on previous velocity
+      const impactVelocity = Math.abs(prevVelocity.current);
+      const damage = Math.floor(impactVelocity * 2);
+      takeDamage(damage);
+    }
+    prevVelocity.current = currentVerticalVel;
+
+    // Simple world loop
+    if (worldPosition.y <= WORLD_BOTTOM) {
+      rigidBodyRef.current.setTranslation(
+        { x: worldPosition.x, y: WORLD_HEIGHT, z: worldPosition.z },
+        true
+      );
+      // Maintain velocity through the teleport
+      rigidBodyRef.current.setLinvel(currentVel, true);
+    }
+
     // Get current rotation for movement direction
     const rotation = cameraRotation.current.y;
 
@@ -58,56 +83,46 @@ export function Player() {
     if (isUpPressed) cameraRotation.current.x = Math.max(cameraRotation.current.x - CAMERA_ROTATION_SPEED, -MAX_VERTICAL_ROTATION);
     if (isDownPressed) cameraRotation.current.x = Math.min(cameraRotation.current.x + CAMERA_ROTATION_SPEED, MAX_VERTICAL_ROTATION);
 
-    // Calculate movement direction
-    velocity.current.set(0, 0, 0);
+    // Only allow movement if game is not complete
+    if (!isGameComplete) {
+      // Calculate movement direction
+      velocity.current.set(0, 0, 0);
 
-    if (keysPressed.current['KeyW']) {
-      velocity.current.x += Math.sin(rotation);
-      velocity.current.z += Math.cos(rotation);
-    }
-    if (keysPressed.current['KeyS']) {
-      velocity.current.x -= Math.sin(rotation);
-      velocity.current.z -= Math.cos(rotation);
-    }
-    if (keysPressed.current['KeyA']) {
-      velocity.current.x += Math.cos(rotation);
-      velocity.current.z -= Math.sin(rotation);
-    }
-    if (keysPressed.current['KeyD']) {
-      velocity.current.x -= Math.cos(rotation);
-      velocity.current.z += Math.sin(rotation);
-    }
+      if (keysPressed.current['KeyW']) {
+        velocity.current.x += Math.sin(rotation);
+        velocity.current.z += Math.cos(rotation);
+      }
+      if (keysPressed.current['KeyS']) {
+        velocity.current.x -= Math.sin(rotation);
+        velocity.current.z -= Math.cos(rotation);
+      }
+      if (keysPressed.current['KeyA']) {
+        velocity.current.x += Math.cos(rotation);
+        velocity.current.z -= Math.sin(rotation);
+      }
+      if (keysPressed.current['KeyD']) {
+        velocity.current.x -= Math.cos(rotation);
+        velocity.current.z += Math.sin(rotation);
+      }
 
-    // Apply movement
-    if (velocity.current.length() > 0) {
-      velocity.current.normalize().multiplyScalar(MOVEMENT_SPEED);
-      const currentVel = rigidBodyRef.current.linvel();
-      rigidBodyRef.current.setLinvel({ 
-        x: velocity.current.x, 
-        y: currentVel.y, 
-        z: velocity.current.z 
-      }, true);
-    } else {
-      // Apply friction when no keys are pressed
-      const currentVel = rigidBodyRef.current.linvel();
-      rigidBodyRef.current.setLinvel({ 
-        x: 0, 
-        y: currentVel.y, 
-        z: 0 
-      }, true);
-    }
-
-    // Check for world loop (when falling below bottom)
-    const worldPosition = rigidBodyRef.current.translation();
-    if (worldPosition.y <= WORLD_BOTTOM) {
-      // Teleport to top of world with current velocity
-      const currentVel = rigidBodyRef.current.linvel();
-      rigidBodyRef.current.setTranslation(
-        { x: worldPosition.x, y: WORLD_HEIGHT, z: worldPosition.z },
-        true
-      );
-      // Maintain falling velocity
-      rigidBodyRef.current.setLinvel(currentVel, true);
+      // Apply movement
+      if (velocity.current.length() > 0) {
+        velocity.current.normalize().multiplyScalar(MOVEMENT_SPEED);
+        const currentVel = rigidBodyRef.current.linvel();
+        rigidBodyRef.current.setLinvel({ 
+          x: velocity.current.x, 
+          y: currentVel.y, 
+          z: velocity.current.z 
+        }, true);
+      } else {
+        // Apply friction when no keys are pressed
+        const currentVel = rigidBodyRef.current.linvel();
+        rigidBodyRef.current.setLinvel({ 
+          x: 0, 
+          y: currentVel.y, 
+          z: 0 
+        }, true);
+      }
     }
 
     // Update position in store
@@ -157,7 +172,7 @@ export function Player() {
         lockRotations
         friction={0}
         enabledRotations={[false, false, false]}
-        ccd
+        ccd={true}
       >
         <mesh>
           <boxGeometry args={[1, 1, 1]} />
