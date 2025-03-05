@@ -14,6 +14,19 @@ const WORLD_BOTTOM = 0;
 const PLATFORM_HEIGHT = 50;
 const WORLD_OFFSET = 100; // Distance between mirrored elements
 
+// Create audio element for damage sound
+let damageSound: HTMLAudioElement;
+
+const playDamageSound = () => {
+  if (!damageSound) {
+    damageSound = new Audio('/assets/minecraft-oof.mp3');
+    damageSound.volume = 0.3; // Set volume to 30%
+  }
+  // Reset and play the sound
+  damageSound.currentTime = 0;
+  damageSound.play().catch(console.error); // Catch any autoplay issues
+};
+
 export function Player() {
   const rigidBodyRef = useRef<any>(null);
   const velocity = useRef(new Vector3());
@@ -55,6 +68,7 @@ export function Player() {
       const impactVelocity = Math.abs(prevVelocity.current);
       const damage = Math.floor(impactVelocity * 2);
       takeDamage(damage);
+      playDamageSound();
     }
     prevVelocity.current = currentVerticalVel;
 

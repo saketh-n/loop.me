@@ -7,6 +7,7 @@ export function GameUI() {
   const maxHealth = useGameStore((state) => state.maxHealth);
   const isGameComplete = useGameStore((state) => state.isGameComplete);
   const [showInstructions, setShowInstructions] = useState(true);
+  const [tutorialStep, setTutorialStep] = useState(1); // Track tutorial progress
   const [showDamageFlash, setShowDamageFlash] = useState(false);
   const prevHealth = useRef(health);
   
@@ -32,17 +33,67 @@ export function GameUI() {
     prevHealth.current = health;
   }, [health]);
 
-  // Escape key handler
+  // Handle keyboard controls for tutorial and instructions
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape') {
         setShowInstructions(prev => !prev);
+      } else if (e.code === 'Space' && tutorialStep === 1) {
+        setTutorialStep(2);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [tutorialStep]);
+
+  // Tutorial Content
+  const renderTutorialContent = () => {
+    switch (tutorialStep) {
+      case 1:
+        return (
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.7)',
+            padding: '20px',
+            borderRadius: '10px',
+            maxWidth: '400px',
+            margin: '0 auto',
+            textAlign: 'center',
+          }}>
+            <h2 style={{ margin: '0 0 15px 0', fontSize: '24px' }}>Welcome to loop.me</h2>
+            <p style={{ margin: '0 0 15px 0', fontSize: '18px' }}>
+              Your objective is to bring your health bar to 0
+            </p>
+            <p style={{ margin: '0', fontSize: '16px', opacity: 0.8 }}>
+              Press SPACEBAR to continue
+            </p>
+            <p style={{ margin: '10px 0 0 0', fontSize: '14px', opacity: 0.6 }}>
+              Press ESC to toggle instructions
+            </p>
+          </div>
+        );
+      case 2:
+        return (
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.7)',
+            padding: '20px',
+            borderRadius: '10px',
+            maxWidth: '300px',
+            margin: '0 auto',
+          }}>
+            <h2 style={{ margin: '0 0 15px 0' }}>Controls</h2>
+            <p style={{ margin: '0 0 8px 0' }}>W - Move Forward</p>
+            <p style={{ margin: '0 0 8px 0' }}>S - Move Backward</p>
+            <p style={{ margin: '0 0 8px 0' }}>A - Move Left</p>
+            <p style={{ margin: '0 0 8px 0' }}>D - Move Right</p>
+            <p style={{ margin: '0 0 8px 0' }}>↑↓←→ - Control Camera</p>
+            <p style={{ margin: '0 0 8px 0' }}>ESC - Toggle Instructions</p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <>
@@ -127,7 +178,7 @@ export function GameUI() {
         }} />
       </div>
 
-      {/* Instructions */}
+      {/* Tutorial/Instructions */}
       {showInstructions && !isGameComplete && (
         <div style={{
           position: 'absolute',
@@ -139,22 +190,7 @@ export function GameUI() {
           fontFamily: 'Arial, sans-serif',
           pointerEvents: 'none',
         }}>
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.5)',
-            padding: '20px',
-            borderRadius: '10px',
-            maxWidth: '300px',
-            margin: '0 auto',
-          }}>
-            <h2 style={{ margin: '0 0 10px 0' }}>Controls</h2>
-            <p style={{ margin: '0 0 5px 0' }}>W - Move Forward</p>
-            <p style={{ margin: '0 0 5px 0' }}>S - Move Backward</p>
-            <p style={{ margin: '0 0 5px 0' }}>A - Move Left</p>
-            <p style={{ margin: '0 0 5px 0' }}>D - Move Right</p>
-            <p style={{ margin: '0 0 5px 0' }}>↑↓←→ - Control Camera</p>
-            <p style={{ margin: '0 0 5px 0' }}>ESC - Toggle Instructions</p>
-            <h3 style={{ margin: '15px 0 5px 0' }}>Score: {score}</h3>
-          </div>
+          {renderTutorialContent()}
         </div>
       )}
     </>
