@@ -1,12 +1,13 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef, useEffect } from 'react';
-import { Vector3, Euler } from 'three';
+import { Vector3, Euler, Matrix4 } from 'three';
 import { useGameStore } from '../store/gameStore';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 
 const MOVEMENT_SPEED = 8; // Increased speed for better responsiveness
-const CAMERA_ROTATION_SPEED = 0.03;
-const MAX_VERTICAL_ROTATION = Math.PI * 0.45; // Increased to ~81 degrees
+const MOUSE_SENSITIVITY = 0.002; // New sensitivity constant for mouse movement
+const JUMP_FORCE = 10; // New constant for jump strength
+const VELOCITY_EPSILON = 0.1; // Threshold to consider velocity as "zero"
 
 // World boundaries
 const WORLD_HEIGHT = 100;
@@ -54,6 +55,31 @@ export function Player() {
     };
   }, []);
   
+  // Set up mouse controls for camera
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (document.pointerLockElement === document.body) {
+        // Update rotations without any bounds
+        cameraRotation.current.y -= e.movementX * MOUSE_SENSITIVITY;
+        cameraRotation.current.x -= e.movementY * MOUSE_SENSITIVITY;
+      }
+    };
+
+    const handleClick = () => {
+      if (document.pointerLockElement !== document.body) {
+        document.body.requestPointerLock();
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.body.addEventListener('click', handleClick);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.body.removeEventListener('click', handleClick);
+    };
+  }, []);
+  
   useFrame((state, delta) => {
     if (!rigidBodyRef.current) return;
 
@@ -72,6 +98,16 @@ export function Player() {
     }
     prevVelocity.current = currentVerticalVel;
 
+    // Handle jumping
+    if (!isGameComplete && keysPressed.current['Space'] && Math.abs(currentVerticalVel) < VELOCITY_EPSILON) {
+      rigidBodyRef.current.setLinvel({ 
+        x: currentVel.x, 
+        y: JUMP_FORCE, 
+        z: currentVel.z 
+      }, true);
+      keysPressed.current['Space'] = false; // Prevent holding space
+    }
+
     // Simple world loop
     if (worldPosition.y <= WORLD_BOTTOM) {
       rigidBodyRef.current.setTranslation(
@@ -82,41 +118,26 @@ export function Player() {
       rigidBodyRef.current.setLinvel(currentVel, true);
     }
 
-    // Get current rotation for movement direction
-    const rotation = cameraRotation.current.y;
-
-    // Camera rotation keys (Arrow keys)
-    const isLeftPressed = keysPressed.current['ArrowLeft'];
-    const isRightPressed = keysPressed.current['ArrowRight'];
-    const isUpPressed = keysPressed.current['ArrowUp'];
-    const isDownPressed = keysPressed.current['ArrowDown'];
-
-    // Update camera rotation with increased limits
-    if (isLeftPressed) cameraRotation.current.y += CAMERA_ROTATION_SPEED;
-    if (isRightPressed) cameraRotation.current.y -= CAMERA_ROTATION_SPEED;
-    if (isUpPressed) cameraRotation.current.x = Math.max(cameraRotation.current.x - CAMERA_ROTATION_SPEED, -MAX_VERTICAL_ROTATION);
-    if (isDownPressed) cameraRotation.current.x = Math.min(cameraRotation.current.x + CAMERA_ROTATION_SPEED, MAX_VERTICAL_ROTATION);
-
     // Only allow movement if game is not complete
     if (!isGameComplete) {
       // Calculate movement direction
       velocity.current.set(0, 0, 0);
 
       if (keysPressed.current['KeyW']) {
-        velocity.current.x += Math.sin(rotation);
-        velocity.current.z += Math.cos(rotation);
+        velocity.current.x += Math.sin(cameraRotation.current.y);
+        velocity.current.z += Math.cos(cameraRotation.current.y);
       }
       if (keysPressed.current['KeyS']) {
-        velocity.current.x -= Math.sin(rotation);
-        velocity.current.z -= Math.cos(rotation);
+        velocity.current.x -= Math.sin(cameraRotation.current.y);
+        velocity.current.z -= Math.cos(cameraRotation.current.y);
       }
       if (keysPressed.current['KeyA']) {
-        velocity.current.x += Math.cos(rotation);
-        velocity.current.z -= Math.sin(rotation);
+        velocity.current.x += Math.cos(cameraRotation.current.y);
+        velocity.current.z -= Math.sin(cameraRotation.current.y);
       }
       if (keysPressed.current['KeyD']) {
-        velocity.current.x -= Math.cos(rotation);
-        velocity.current.z += Math.sin(rotation);
+        velocity.current.x -= Math.cos(cameraRotation.current.y);
+        velocity.current.z += Math.sin(cameraRotation.current.y);
       }
 
       // Apply movement
@@ -142,37 +163,22 @@ export function Player() {
     // Update position in store
     setPosition([worldPosition.x, worldPosition.y, worldPosition.z]);
 
-    // Update camera position with dynamic adjustments
-    const verticalRotation = cameraRotation.current.x;
-    
-    // Adjust camera distance and height based on vertical rotation
-    const baseDistance = 8;
-    const baseHeight = 5;
-    
-    // Dynamic camera adjustments
-    const rotationFactor = Math.abs(verticalRotation) / MAX_VERTICAL_ROTATION;
-    const cameraDistance = baseDistance * (1 + rotationFactor * 0.5); // Increase distance when looking up/down
-    const cameraHeight = baseHeight * (1 - rotationFactor * 0.5); // Decrease height when looking up/down
+    // Create rotation matrix for full 360° rotation
+    const rotationMatrix = new Matrix4();
+    rotationMatrix.makeRotationY(cameraRotation.current.y);
+    rotationMatrix.multiply(new Matrix4().makeRotationX(cameraRotation.current.x));
 
-    let adjustedY = worldPosition.y;
-    
-    // Adjust camera when near world boundaries
-    if (worldPosition.y <= WORLD_BOTTOM + 10) {
-      const blend = (worldPosition.y - WORLD_BOTTOM) / 10;
-      adjustedY = blend * worldPosition.y + (1 - blend) * (WORLD_HEIGHT - 10);
-    } else if (worldPosition.y >= WORLD_HEIGHT - 10) {
-      const blend = (WORLD_HEIGHT - worldPosition.y) / 10;
-      adjustedY = blend * worldPosition.y + (1 - blend) * (WORLD_BOTTOM + 10);
-    }
+    // Calculate camera offset
+    const cameraOffset = new Vector3(0, 0, 8); // Start with camera behind player
+    cameraOffset.applyMatrix4(rotationMatrix); // Apply full rotation
 
-    // Update camera position with dynamic adjustments
-    state.camera.position.x = worldPosition.x - Math.sin(rotation) * cameraDistance;
-    state.camera.position.y = adjustedY + cameraHeight + Math.sin(verticalRotation) * cameraDistance * 1.5;
-    state.camera.position.z = worldPosition.z - Math.cos(rotation) * cameraDistance;
-    
-    // Adjust lookAt target based on vertical rotation
-    const lookAtHeight = verticalRotation < 0 ? 2 : 0; // Look higher when looking up
-    state.camera.lookAt(worldPosition.x, worldPosition.y + lookAtHeight, worldPosition.z);
+    // Set camera position
+    state.camera.position.x = worldPosition.x + cameraOffset.x;
+    state.camera.position.y = worldPosition.y + cameraOffset.y;
+    state.camera.position.z = worldPosition.z + cameraOffset.z;
+
+    // Make camera look at player
+    state.camera.lookAt(worldPosition.x, worldPosition.y, worldPosition.z);
   });
 
   return (

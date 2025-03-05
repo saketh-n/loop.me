@@ -7,7 +7,6 @@ export function GameUI() {
   const maxHealth = useGameStore((state) => state.maxHealth);
   const isGameComplete = useGameStore((state) => state.isGameComplete);
   const [showInstructions, setShowInstructions] = useState(true);
-  const [tutorialStep, setTutorialStep] = useState(1); // Track tutorial progress
   const [showDamageFlash, setShowDamageFlash] = useState(false);
   const prevHealth = useRef(health);
   
@@ -36,63 +35,62 @@ export function GameUI() {
   // Handle keyboard controls for tutorial and instructions
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Escape') {
+      if (e.key.toLowerCase() === 'x') {
         setShowInstructions(prev => !prev);
-      } else if (e.code === 'Space' && tutorialStep === 1) {
-        setTutorialStep(2);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tutorialStep]);
+  }, []);
 
   // Tutorial Content
   const renderTutorialContent = () => {
-    switch (tutorialStep) {
-      case 1:
-        return (
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.7)',
-            padding: '20px',
-            borderRadius: '10px',
-            maxWidth: '400px',
-            margin: '0 auto',
-            textAlign: 'center',
-          }}>
-            <h2 style={{ margin: '0 0 15px 0', fontSize: '24px' }}>Welcome to loop.me</h2>
-            <p style={{ margin: '0 0 15px 0', fontSize: '18px' }}>
-              Your objective is to bring your health bar to 0
-            </p>
-            <p style={{ margin: '0', fontSize: '16px', opacity: 0.8 }}>
-              Press SPACEBAR to continue
-            </p>
-            <p style={{ margin: '10px 0 0 0', fontSize: '14px', opacity: 0.6 }}>
-              Press ESC to toggle instructions
-            </p>
-          </div>
-        );
-      case 2:
-        return (
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.7)',
-            padding: '20px',
-            borderRadius: '10px',
-            maxWidth: '300px',
-            margin: '0 auto',
-          }}>
-            <h2 style={{ margin: '0 0 15px 0' }}>Controls</h2>
-            <p style={{ margin: '0 0 8px 0' }}>W - Move Forward</p>
-            <p style={{ margin: '0 0 8px 0' }}>S - Move Backward</p>
-            <p style={{ margin: '0 0 8px 0' }}>A - Move Left</p>
-            <p style={{ margin: '0 0 8px 0' }}>D - Move Right</p>
-            <p style={{ margin: '0 0 8px 0' }}>↑↓←→ - Control Camera</p>
-            <p style={{ margin: '0 0 8px 0' }}>ESC - Toggle Instructions</p>
-          </div>
-        );
-      default:
-        return null;
-    }
+    return (
+      <div style={{
+        background: 'rgba(0, 0, 0, 0.7)',
+        padding: '20px',
+        borderRadius: '10px',
+        maxWidth: '400px',
+        margin: '0 auto',
+      }}>
+        <h2 style={{ margin: '0 0 15px 0', fontSize: '24px', textAlign: 'center' }}>
+          Welcome to loop.me
+        </h2>
+        
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#ff6b6b' }}>Objective</h3>
+          <p style={{ margin: '0 0 5px 0', fontSize: '16px' }}>
+            Your goal is to bring your health bar to 0 by falling and taking damage.
+          </p>
+          <p style={{ margin: '0 0 5px 0', fontSize: '16px' }}>
+            The world loops vertically - falling off the bottom brings you back to the top!
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#4ecdc4' }}>Controls</h3>
+          <p style={{ margin: '0 0 5px 0' }}>Mouse - Look around</p>
+          <p style={{ margin: '0 0 5px 0' }}>W - Move Forward</p>
+          <p style={{ margin: '0 0 5px 0' }}>S - Move Backward</p>
+          <p style={{ margin: '0 0 5px 0' }}>A - Move Left</p>
+          <p style={{ margin: '0 0 5px 0' }}>D - Move Right</p>
+          <p style={{ margin: '0 0 5px 0' }}>SPACE - Jump (only when on ground)</p>
+          <p style={{ margin: '0 0 5px 0' }}>X - Toggle Instructions</p>
+          <p style={{ margin: '0 0 5px 0' }}>ESC - Release Mouse</p>
+        </div>
+
+        <p style={{ 
+          margin: '10px 0 0 0', 
+          fontSize: '14px', 
+          opacity: 0.8, 
+          textAlign: 'center',
+          fontStyle: 'italic'
+        }}>
+          Click anywhere to start controlling the camera
+        </p>
+      </div>
+    );
   };
 
   return (
