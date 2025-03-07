@@ -12,7 +12,6 @@ function App() {
           near: 0.1,
           far: 1000  // Increased far plane distance significantly
         }}
-        style={{ background: 'skyblue' }}
       >
         <GameScene />
       </Canvas>

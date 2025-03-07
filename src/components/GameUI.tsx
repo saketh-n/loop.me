@@ -2,7 +2,6 @@ import { useGameStore } from '../store/gameStore';
 import { useState, useEffect, useRef } from 'react';
 
 export function GameUI() {
-  const score = useGameStore((state) => state.score);
   const health = useGameStore((state) => state.health);
   const maxHealth = useGameStore((state) => state.maxHealth);
   const isGameComplete = useGameStore((state) => state.isGameComplete);
@@ -75,7 +74,6 @@ export function GameUI() {
           <p style={{ margin: '0 0 5px 0' }}>S - Move Backward</p>
           <p style={{ margin: '0 0 5px 0' }}>A - Move Left</p>
           <p style={{ margin: '0 0 5px 0' }}>D - Move Right</p>
-          <p style={{ margin: '0 0 5px 0' }}>SPACE - Jump (only when on ground)</p>
           <p style={{ margin: '0 0 5px 0' }}>X - Toggle Instructions</p>
           <p style={{ margin: '0 0 5px 0' }}>ESC - Release Mouse</p>
         </div>
