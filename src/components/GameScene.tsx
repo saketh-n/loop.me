@@ -4,6 +4,7 @@ import { Player } from './Player';
 import { useLoader } from '@react-three/fiber';
 import { Sky } from '@react-three/drei';
 import { InteractiveGrass } from './InteractiveGrass';
+import { WindParticles } from './WindParticles';
 
 // World boundaries
 const PLATFORM_HEIGHT = 50;
@@ -91,6 +92,9 @@ export function GameScene() {
         inclination={0.6}
         azimuth={0.25}
       />
+
+      {/* Wind Particles */}
+      <WindParticles />
 
       {/* Main Platform (Physical) */}
       <RigidBody type="fixed" colliders="cuboid">

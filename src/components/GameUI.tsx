@@ -74,6 +74,9 @@ export function GameUI() {
           <p style={{ margin: '0 0 5px 0' }}>S - Move Backward</p>
           <p style={{ margin: '0 0 5px 0' }}>A - Move Left</p>
           <p style={{ margin: '0 0 5px 0' }}>D - Move Right</p>
+          <p style={{ margin: '0 0 5px 0' }}>Space - Jump</p>
+          <p style={{ margin: '0 0 5px 0' }}>Shift - Run (1.5x Speed)</p>
+          <p style={{ margin: '0 0 5px 0' }}>Control - Sprint (2x Speed)</p>
           <p style={{ margin: '0 0 5px 0' }}>X - Toggle Instructions</p>
           <p style={{ margin: '0 0 5px 0' }}>ESC - Release Mouse</p>
         </div>
