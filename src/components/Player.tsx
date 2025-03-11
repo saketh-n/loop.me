@@ -23,7 +23,7 @@ const AIR_CONTROL = 0.08; // Realistic air control (about 8% of vertical speed)
 
 // Wind physics
 const WIND_DIRECTION = new Vector3(-1, 0, 1).normalize(); // NE to SW direction
-const WIND_STRENGTH = 0.2; // Wind speed in m/s (about 0.45mph)
+const WIND_STRENGTH = 1; // Wind speed in m/s (about 0.45mph)
 
 // World boundaries
 const WORLD_HEIGHT = 100;
@@ -57,6 +57,7 @@ export function Player() {
   const prevVelocity = useRef<number>(0);
   const canJump = useRef(true);
   const { position, setPosition, takeDamage, isGameComplete } = useGameStore();
+  const hasLegsEnabled = useGameStore((state) => state.hasLegsEnabled);
   
   const currentVelocity = useRef(new Vector3());
   const cameraQuaternion = useRef(new Quaternion());
@@ -198,10 +199,20 @@ export function Player() {
       // Calculate target movement direction
       const moveDirection = new Vector3(0, 0, 0);
       
-      if (keysPressed.current['KeyW']) moveDirection.z -= 1;
-      if (keysPressed.current['KeyS']) moveDirection.z += 1;
-      if (keysPressed.current['KeyD']) moveDirection.x += 1;
-      if (keysPressed.current['KeyA']) moveDirection.x -= 1;
+      // Handle jumping - only when grounded and legs aren't broken
+      if (keysPressed.current['Space'] && canJump.current && isGrounded && hasLegsEnabled) {
+        verticalVelocity.current = JUMP_FORCE;
+        velocity.current.y = JUMP_FORCE;
+        canJump.current = false;
+      }
+
+      // Only allow movement if legs are enabled
+      if (hasLegsEnabled) {
+        if (keysPressed.current['KeyW']) moveDirection.z -= 1;
+        if (keysPressed.current['KeyS']) moveDirection.z += 1;
+        if (keysPressed.current['KeyD']) moveDirection.x += 1;
+        if (keysPressed.current['KeyA']) moveDirection.x -= 1;
+      }
       
       if (moveDirection.lengthSq() > 0) {
         moveDirection.normalize();

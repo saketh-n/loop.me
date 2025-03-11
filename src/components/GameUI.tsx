@@ -5,23 +5,12 @@ export function GameUI() {
   const health = useGameStore((state) => state.health);
   const maxHealth = useGameStore((state) => state.maxHealth);
   const isGameComplete = useGameStore((state) => state.isGameComplete);
+  const isGameFailed = useGameStore((state) => state.isGameFailed);
   const [showInstructions, setShowInstructions] = useState(true);
   const [showDamageFlash, setShowDamageFlash] = useState(false);
+  const [showFailureDialog, setShowFailureDialog] = useState(true);
   const prevHealth = useRef(health);
   
-  // Health regeneration (only when game is not complete)
-  useEffect(() => {
-    if (isGameComplete) return;
-    
-    const interval = setInterval(() => {
-      if (health < maxHealth) {
-        useGameStore.getState().takeDamage(-40); // Negative damage = healing
-      }
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, [health, maxHealth, isGameComplete]);
-
   // Damage flash effect
   useEffect(() => {
     if (health < prevHealth.current) {
@@ -42,6 +31,10 @@ export function GameUI() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const handleRestart = () => {
+    window.location.reload();
+  };
 
   // Tutorial Content
   const renderTutorialContent = () => {
@@ -96,8 +89,8 @@ export function GameUI() {
 
   return (
     <>
-      {/* Victory Screen */}
-      {isGameComplete && (
+      {/* Victory Screen - Show when health is 0 */}
+      {health === 0 && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -121,7 +114,7 @@ export function GameUI() {
             Congratulations you have beat the level!
           </h1>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={handleRestart}
             style={{
               padding: '15px 30px',
               fontSize: '24px',
@@ -143,8 +136,75 @@ export function GameUI() {
         </div>
       )}
 
+      {/* Failure Dialog - Show only when legs are broken AND health > 0 */}
+      {isGameFailed && health > 0 && showFailureDialog && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          padding: '20px',
+          borderRadius: '10px',
+          color: 'white',
+          fontFamily: 'Arial, sans-serif',
+          zIndex: 1000,
+          minWidth: '300px',
+          textAlign: 'center',
+          boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+        }}>
+          <h2 style={{ 
+            fontSize: '24px',
+            marginBottom: '15px',
+            color: '#ff6b6b'
+          }}>
+            You are unable to proceed
+          </h2>
+          <div style={{
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'center'
+          }}>
+            <button 
+              onClick={() => setShowFailureDialog(false)}
+              style={{
+                padding: '8px 16px',
+                fontSize: '16px',
+                backgroundColor: '#4a4a4a',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#666666'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#4a4a4a'}
+            >
+              Dismiss
+            </button>
+            <button 
+              onClick={handleRestart}
+              style={{
+                padding: '8px 16px',
+                fontSize: '16px',
+                backgroundColor: '#ff6b6b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#ff8585'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ff6b6b'}
+            >
+              Restart
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Damage Flash Overlay */}
-      {showDamageFlash && !isGameComplete && (
+      {showDamageFlash && health > 0 && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -178,7 +238,7 @@ export function GameUI() {
       </div>
 
       {/* Tutorial/Instructions */}
-      {showInstructions && !isGameComplete && (
+      {showInstructions && health > 0 && (
         <div style={{
           position: 'absolute',
           top: 0,
