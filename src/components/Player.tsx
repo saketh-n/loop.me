@@ -48,6 +48,9 @@ const playDamageSound = () => {
   damageSound.play().catch(console.error); // Catch any autoplay issues
 };
 
+// Constants
+const ENDLESS_FALL_TIME = 30; // Time in seconds before showing endless fall dialog
+
 export function Player() {
   const rigidBodyRef = useRef<any>(null);
   const velocity = useRef(new Vector3());
@@ -56,7 +59,16 @@ export function Player() {
   const keysPressed = useRef<{ [key: string]: boolean }>({});
   const prevVelocity = useRef<number>(0);
   const canJump = useRef(true);
-  const { position, setPosition, takeDamage, isGameComplete } = useGameStore();
+  const { 
+    position, 
+    setPosition, 
+    takeDamage, 
+    isGameComplete,
+    setFallTime,
+    setEndlessFall,
+    isEndlessFall,
+    health
+  } = useGameStore();
   const hasLegsEnabled = useGameStore((state) => state.hasLegsEnabled);
   
   const currentVelocity = useRef(new Vector3());
@@ -69,6 +81,8 @@ export function Player() {
   // Camera state
   const cameraAngleHorizontal = useRef(0);
   const cameraAngleVertical = useRef(0);
+
+  const fallTimeRef = useRef(0);
 
   // Set up keyboard controls
   useEffect(() => {
@@ -92,7 +106,7 @@ export function Player() {
   // Set up mouse controls for camera
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement === document.body) {
+      if (document.pointerLockElement === document.body && !isGameComplete && health > 0) {
         // Update camera angles
         cameraAngleHorizontal.current += e.movementX * MOUSE_SENSITIVITY;
         // Start at π/2 (behind character) and constrain between 15 and 180 degrees
@@ -109,7 +123,7 @@ export function Player() {
     };
 
     const handleClick = () => {
-      if (!isGameComplete && document.pointerLockElement !== document.body) {
+      if (!isGameComplete && health > 0 && document.pointerLockElement !== document.body) {
         document.body.requestPointerLock();
       }
     };
@@ -121,14 +135,14 @@ export function Player() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.body.removeEventListener('click', handleClick);
     };
-  }, [isGameComplete]);
+  }, [isGameComplete, health]);
   
-  // Release cursor when game is complete
+  // Release cursor when game is complete or health is 0
   useEffect(() => {
-    if (isGameComplete && document.pointerLockElement === document.body) {
+    if ((isGameComplete || health === 0) && document.pointerLockElement === document.body) {
       document.exitPointerLock();
     }
-  }, [isGameComplete]);
+  }, [isGameComplete, health]);
   
   // Initialize camera angle to be behind character
   useEffect(() => {
@@ -148,6 +162,21 @@ export function Player() {
     if (isGrounded) {
       canJump.current = true;
       verticalVelocity.current = 0;
+      // Reset fall time when grounded
+      fallTimeRef.current = 0;
+      setFallTime(0);
+      if (isEndlessFall) {
+        setEndlessFall(false);
+      }
+    } else {
+      // Update fall time when in air
+      fallTimeRef.current += delta;
+      setFallTime(fallTimeRef.current);
+      
+      // Check for endless fall
+      if (fallTimeRef.current >= ENDLESS_FALL_TIME && !isEndlessFall) {
+        setEndlessFall(true);
+      }
     }
 
     // Impact detection

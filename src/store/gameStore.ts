@@ -14,6 +14,10 @@ interface GameState {
   setLegsEnabled: (enabled: boolean) => void;
   isGameFailed: boolean;
   setGameFailed: (failed: boolean) => void;
+  fallTime: number;
+  setFallTime: (time: number) => void;
+  isEndlessFall: boolean;
+  setEndlessFall: (endless: boolean) => void;
 }
 
 export const useGameStore = create<GameState>((set) => ({
@@ -40,4 +44,8 @@ export const useGameStore = create<GameState>((set) => ({
   setLegsEnabled: (enabled) => set({ hasLegsEnabled: enabled }),
   isGameFailed: false,
   setGameFailed: (failed) => set({ isGameFailed: failed }),
+  fallTime: 0,
+  setFallTime: (time) => set({ fallTime: time }),
+  isEndlessFall: false,
+  setEndlessFall: (endless) => set({ isEndlessFall: endless }),
 })); 

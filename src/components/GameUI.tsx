@@ -6,9 +6,12 @@ export function GameUI() {
   const maxHealth = useGameStore((state) => state.maxHealth);
   const isGameComplete = useGameStore((state) => state.isGameComplete);
   const isGameFailed = useGameStore((state) => state.isGameFailed);
+  const fallTime = useGameStore((state) => state.fallTime);
+  const isEndlessFall = useGameStore((state) => state.isEndlessFall);
   const [showInstructions, setShowInstructions] = useState(true);
   const [showDamageFlash, setShowDamageFlash] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(true);
+  const [showEndlessFallDialog, setShowEndlessFallDialog] = useState(true);
   const prevHealth = useRef(health);
   
   // Damage flash effect
@@ -200,6 +203,90 @@ export function GameUI() {
               Restart
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Endless Fall Dialog */}
+      {isEndlessFall && health > 0 && showEndlessFallDialog && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          padding: '20px',
+          borderRadius: '10px',
+          color: 'white',
+          fontFamily: 'Arial, sans-serif',
+          zIndex: 1000,
+          minWidth: '300px',
+          textAlign: 'center',
+          boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+        }}>
+          <h2 style={{ 
+            fontSize: '24px',
+            marginBottom: '15px',
+            color: '#ff6b6b'
+          }}>
+            You seem to be in an unwinnable situation
+          </h2>
+          <div style={{
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'center'
+          }}>
+            <button 
+              onClick={() => setShowEndlessFallDialog(false)}
+              style={{
+                padding: '8px 16px',
+                fontSize: '16px',
+                backgroundColor: '#4a4a4a',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#666666'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#4a4a4a'}
+            >
+              Continue
+            </button>
+            <button 
+              onClick={handleRestart}
+              style={{
+                padding: '8px 16px',
+                fontSize: '16px',
+                backgroundColor: '#ff6b6b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#ff8585'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ff6b6b'}
+            >
+              Give Up?
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fall Timer Display (for testing) */}
+      {fallTime > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 60,
+          right: 20,
+          padding: '10px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          color: 'white',
+          borderRadius: '5px',
+          fontFamily: 'monospace',
+          fontSize: '16px',
+        }}>
+          Fall Time: {fallTime.toFixed(1)}s
         </div>
       )}
 
