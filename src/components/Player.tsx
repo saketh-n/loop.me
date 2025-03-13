@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { Vector3, Euler, Matrix4, Quaternion } from 'three';
 import { useGameStore } from '../store/gameStore';
 import { RigidBody } from '@react-three/rapier';
@@ -62,6 +62,7 @@ export function Player() {
   const keysPressed = useRef<{ [key: string]: boolean }>({});
   const prevVelocity = useRef<number>(0);
   const canJump = useRef(true);
+  const lastGroundedTime = useRef(0);
   const { 
     position, 
     setPosition, 
@@ -96,6 +97,12 @@ export function Player() {
   const windStrength = windEnabled && levelConfig.wind.strength ? levelConfig.wind.strength : 0;
   const windDirection = windEnabled && levelConfig.wind.direction ? levelConfig.wind.direction : new Vector3();
   const windGustStrength = windEnabled && levelConfig.wind.gustStrength ? levelConfig.wind.gustStrength : 0;
+
+  // Get initial spawn position
+  const spawnPosition = useMemo(() => {
+    const offset = levelConfig.spawnOffset || [0, 0];
+    return new Vector3(offset[0], levelConfig.spawnHeight + 2, offset[1]);
+  }, [levelConfig]);
 
   // Set up keyboard controls
   useEffect(() => {
@@ -177,11 +184,19 @@ export function Player() {
     if (isGrounded) {
       canJump.current = true;
       verticalVelocity.current = 0;
+      lastGroundedTime.current = state.clock.elapsedTime;
       // Reset fall time when grounded
       fallTimeRef.current = 0;
       setFallTime(0);
       if (isEndlessFall) {
         setEndlessFall(false);
+      }
+
+      // If on a moving platform, inherit its velocity
+      if (levelConfig.platformMovement) {
+        const { speed, direction } = levelConfig.platformMovement;
+        const platformVelocity = new Vector3(...direction).multiplyScalar(speed);
+        currentVelocity.current.add(platformVelocity);
       }
     } else {
       // Update fall time when in air
@@ -365,7 +380,7 @@ export function Player() {
       {/* Main Player Character */}
       <RigidBody 
         ref={rigidBodyRef}
-        position={[0, levelConfig.spawnHeight + 2, 0]}
+        position={[spawnPosition.x, spawnPosition.y, spawnPosition.z]}
         colliders="cuboid"
         mass={1}
         lockRotations

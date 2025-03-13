@@ -1,5 +1,6 @@
 import { useGameStore } from '../store/gameStore';
 import { useState, useEffect, useRef } from 'react';
+import { levels } from '../config/levels';
 
 export function GameUI() {
   const health = useGameStore((state) => state.health);
@@ -16,6 +17,10 @@ export function GameUI() {
   const [showEndlessFallDialog, setShowEndlessFallDialog] = useState(true);
   const prevHealth = useRef(health);
   
+  // Get total number of levels
+  const totalLevels = levels.length;
+  const isLastLevel = currentLevel === totalLevels;
+
   // Damage flash effect
   useEffect(() => {
     if (health < prevHealth.current) {
@@ -120,10 +125,10 @@ export function GameUI() {
             marginBottom: '20px',
             textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
           }}>
-            {currentLevel === 2 ? "You Won!" : "Congratulations you have beat the level!"}
+            {isLastLevel ? "You Won!" : "Congratulations you have beat the level!"}
           </h1>
           <button 
-            onClick={currentLevel === 2 ? handleRestart : handleProceed}
+            onClick={isLastLevel ? handleRestart : handleProceed}
             style={{
               padding: '15px 30px',
               fontSize: '24px',
@@ -140,7 +145,7 @@ export function GameUI() {
             onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
             onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           >
-            {currentLevel === 2 ? "PLAY AGAIN" : "PROCEED"}
+            {isLastLevel ? "PLAY AGAIN" : "PROCEED"}
           </button>
         </div>
       )}
