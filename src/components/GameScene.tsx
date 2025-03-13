@@ -5,12 +5,12 @@ import { useLoader } from '@react-three/fiber';
 import { Sky } from '@react-three/drei';
 import { InteractiveGrass } from './InteractiveGrass';
 import { WindParticles } from './WindParticles';
-
-// World boundaries
-const PLATFORM_HEIGHT = 50;
-const WORLD_OFFSET = 100; // Distance between mirrored elements
+import { useGameStore } from '../store/gameStore';
+import { CuboidCollider } from '@react-three/rapier';
 
 export function GameScene() {
+  const levelConfig = useGameStore((state) => state.levelConfig);
+  
   // Load textures with error handling
   const grassTexture = useLoader(TextureLoader, '/textures/grass.jpg', undefined, (error) => {
     console.error('Failed to load grass texture:', error);
@@ -24,7 +24,7 @@ export function GameScene() {
   if (grassTexture) {
     grassTexture.wrapS = RepeatWrapping;
     grassTexture.wrapT = RepeatWrapping;
-    grassTexture.repeat.set(6, 6); // Adjust repetition for natural look
+    grassTexture.repeat.set(6, 6);
     grassTexture.magFilter = LinearFilter;
     grassTexture.minFilter = LinearMipmapLinearFilter;
   }
@@ -32,7 +32,7 @@ export function GameScene() {
   if (soilTexture) {
     soilTexture.wrapS = RepeatWrapping;
     soilTexture.wrapT = RepeatWrapping;
-    soilTexture.repeat.set(3, 3); // Less repetition for soil
+    soilTexture.repeat.set(3, 3);
     soilTexture.magFilter = LinearFilter;
     soilTexture.minFilter = LinearMipmapLinearFilter;
   }
@@ -41,10 +41,10 @@ export function GameScene() {
     <group position={basePosition}>
       {/* Main block */}
       <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[20, 1, 20]} />
+        <boxGeometry args={[levelConfig.platformDimensions[0], 1, levelConfig.platformDimensions[1]]} />
         <meshStandardMaterial 
           map={soilTexture}
-          color={soilTexture ? '#ffffff' : '#8B4513'} // Fallback color
+          color={soilTexture ? '#ffffff' : '#8B4513'}
           roughness={0.9}
           metalness={0}
         />
@@ -52,10 +52,10 @@ export function GameScene() {
 
       {/* Grass layer */}
       <mesh position={[0, 0.501, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 20]} />
+        <planeGeometry args={[levelConfig.platformDimensions[0], levelConfig.platformDimensions[1]]} />
         <meshStandardMaterial 
           map={grassTexture}
-          color={grassTexture ? '#ffffff' : '#228B22'} // Fallback color
+          color={grassTexture ? '#ffffff' : '#228B22'}
           transparent={true}
           alphaTest={0.5}
           depthWrite={true}
@@ -66,48 +66,82 @@ export function GameScene() {
       </mesh>
 
       {/* Interactive grass */}
-      <InteractiveGrass 
-        position={[0, 0.5, 0]}
-        count={2000}
-        bounds={[9, 9]} // Slightly smaller than platform to avoid edge overflow
-        height={0.4}
-      />
+      {levelConfig.grass.enabled && (
+        <InteractiveGrass 
+          key={`grass-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
+          position={[0, 0.5, 0]}
+          count={Math.floor(levelConfig.platformDimensions[0] * levelConfig.platformDimensions[1] * levelConfig.grass.density)}
+          bounds={[
+            levelConfig.platformDimensions[0],
+            levelConfig.platformDimensions[1]
+          ]}
+          height={0.4}
+        />
+      )}
     </group>
   );
+
+  // Get sky configuration based on time of day
+  const getSkyConfig = () => {
+    switch (levelConfig.skybox.timeOfDay) {
+      case 'sunrise':
+        return { distance: 450000, sunPosition: [0, 5, 100] as [number, number, number] };
+      case 'sunset':
+        return { distance: 450000, sunPosition: [-100, 5, -50] as [number, number, number] };
+      default: // day
+        return { distance: 450000, sunPosition: [100, 100, 20] as [number, number, number] };
+    }
+  };
+
+  const skyConfig = getSkyConfig();
+
+  console.log('Platform Dimensions:', levelConfig.platformDimensions);
 
   return (
     <Physics debug={false}>
       {/* Lights */}
       <ambientLight intensity={0.8} />
       <directionalLight 
-        position={[100, 100, 20]} 
+        position={skyConfig.sunPosition} 
         intensity={1.5}
         castShadow
       />
 
       {/* Sky */}
       <Sky 
-        distance={450000} // Increased for more realistic horizon
-        sunPosition={[100, 100, 20]}
-        inclination={0.6}
-        azimuth={0.25}
+        distance={skyConfig.distance}
+        sunPosition={skyConfig.sunPosition}
+        inclination={levelConfig.skybox.inclination}
+        azimuth={levelConfig.skybox.azimuth}
       />
 
       {/* Wind Particles */}
-      <WindParticles />
+      {levelConfig.wind.enabled && <WindParticles />}
 
       {/* Main Platform (Physical) */}
-      <RigidBody type="fixed" colliders="cuboid">
-        {createPlatform([0, PLATFORM_HEIGHT, 0])}
+      <RigidBody 
+        type="fixed"
+        key={`platform-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
+      >
+        <CuboidCollider 
+          key={`collider-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
+          args={[
+            levelConfig.platformDimensions[0] * 0.5, // Convert to half-width
+            0.5, // half-height
+            levelConfig.platformDimensions[1] * 0.5  // Convert to half-depth
+          ]} 
+          position={[0, levelConfig.spawnHeight, 0]}
+        />
+        {createPlatform([0, levelConfig.spawnHeight, 0])}
       </RigidBody>
 
       {/* Visual Mirror Platforms */}
       <group>
         {/* Platform Above */}
-        {createPlatform([0, PLATFORM_HEIGHT + WORLD_OFFSET, 0])}
+        {createPlatform([0, levelConfig.spawnHeight + 100, 0])}
 
         {/* Platform Below */}
-        {createPlatform([0, PLATFORM_HEIGHT - WORLD_OFFSET, 0])}
+        {createPlatform([0, levelConfig.spawnHeight - 100, 0])}
       </group>
 
       {/* Player */}

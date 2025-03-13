@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { levels, LevelConfig } from '../config/levels';
 
 interface GameState {
   position: [number, number, number];
@@ -18,9 +19,12 @@ interface GameState {
   setFallTime: (time: number) => void;
   isEndlessFall: boolean;
   setEndlessFall: (endless: boolean) => void;
+  currentLevel: number;
+  levelConfig: LevelConfig;
+  nextLevel: () => void;
 }
 
-export const useGameStore = create<GameState>((set) => ({
+export const useGameStore = create<GameState>((set, get) => ({
   position: [0, 1, 0], // Initial position (x, y, z)
   setPosition: (position) => set({ position }),
   score: 0,
@@ -48,4 +52,24 @@ export const useGameStore = create<GameState>((set) => ({
   setFallTime: (time) => set({ fallTime: time }),
   isEndlessFall: false,
   setEndlessFall: (endless) => set({ isEndlessFall: endless }),
+  currentLevel: 1,
+  levelConfig: levels[0],
+  nextLevel: () => set((state) => {
+    const nextLevelIndex = state.currentLevel;
+    if (nextLevelIndex < levels.length) {
+      return {
+        currentLevel: nextLevelIndex + 1,
+        levelConfig: levels[nextLevelIndex],
+        // Reset state for new level
+        health: 100,
+        hasLegsEnabled: true,
+        isGameComplete: false,
+        isGameFailed: false,
+        isEndlessFall: false,
+        fallTime: 0,
+        position: [0, levels[nextLevelIndex].spawnHeight + 2, 0],
+      };
+    }
+    return state;
+  }),
 })); 

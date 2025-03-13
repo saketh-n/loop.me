@@ -127,9 +127,13 @@ export function InteractiveGrass({
 
   // Initialize grass positions with random rotations
   useMemo(() => {
+    console.log('Bounds:', bounds);
     for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * bounds[0] * 2;
-      const z = (Math.random() - 0.5) * bounds[1] * 2;
+      // Calculate position within the bounds
+      const x = (Math.random() - 0.5) * bounds[0];
+      const z = (Math.random() - 0.5) * bounds[1];
+      
+      // Store the original position
       originalPositions.current.push(new Vector3(x, 0, z));
       timeOffsets.current.push(Math.random() * Math.PI * 2);
     }

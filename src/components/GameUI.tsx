@@ -8,6 +8,8 @@ export function GameUI() {
   const isGameFailed = useGameStore((state) => state.isGameFailed);
   const fallTime = useGameStore((state) => state.fallTime);
   const isEndlessFall = useGameStore((state) => state.isEndlessFall);
+  const nextLevel = useGameStore((state) => state.nextLevel);
+  const currentLevel = useGameStore((state) => state.currentLevel);
   const [showInstructions, setShowInstructions] = useState(true);
   const [showDamageFlash, setShowDamageFlash] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(true);
@@ -37,6 +39,10 @@ export function GameUI() {
 
   const handleRestart = () => {
     window.location.reload();
+  };
+
+  const handleProceed = () => {
+    nextLevel();
   };
 
   // Tutorial Content
@@ -114,10 +120,10 @@ export function GameUI() {
             marginBottom: '20px',
             textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
           }}>
-            Congratulations you have beat the level!
+            {currentLevel === 2 ? "You Won!" : "Congratulations you have beat the level!"}
           </h1>
           <button 
-            onClick={handleRestart}
+            onClick={currentLevel === 2 ? handleRestart : handleProceed}
             style={{
               padding: '15px 30px',
               fontSize: '24px',
@@ -134,7 +140,7 @@ export function GameUI() {
             onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
             onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           >
-            PROCEED
+            {currentLevel === 2 ? "PLAY AGAIN" : "PROCEED"}
           </button>
         </div>
       )}
