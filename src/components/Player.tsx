@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { Vector3, Euler, Matrix4, Quaternion } from 'three';
 import { useGameStore } from '../store/gameStore';
 import { RigidBody } from '@react-three/rapier';
@@ -23,6 +23,9 @@ const AIR_CONTROL = 0.2; // Reduced from 0.6 to 0.2 for less air control
 const GROUND_FRICTION = 1.5;
 const LINEAR_DAMPING = 0.8;
 
+// Safe fall height threshold
+const SAFE_FALL_VELOCITY = -15.8; // Velocity from falling 5 units with gravity of 25
+
 // Wind physics
 const WIND_DIRECTION = [0, 0, 0]; // NE to SW direction
 const WIND_STRENGTH = 0; // Wind speed in m/s (about 0.45mph)
@@ -38,6 +41,9 @@ const WORLD_OFFSET = 100; // Distance between mirrored elements
 const CAMERA_DISTANCE = 12;
 const CAMERA_HEIGHT = 2;
 
+// Game constants
+const ENDLESS_FALL_TIME = 20; // Time in seconds before showing endless fall dialog
+
 // Create audio element for damage sound
 let damageSound: HTMLAudioElement;
 
@@ -50,9 +56,6 @@ const playDamageSound = () => {
   damageSound.currentTime = 0;
   damageSound.play().catch(console.error); // Catch any autoplay issues
 };
-
-// Constants
-const ENDLESS_FALL_TIME = 30; // Time in seconds before showing endless fall dialog
 
 export function Player() {
   const rigidBodyRef = useRef<any>(null);
@@ -104,6 +107,15 @@ export function Player() {
     return new Vector3(offset[0], levelConfig.spawnHeight + 2, offset[1]);
   }, [levelConfig]);
 
+  // Check if player is in water (Level 4)
+  const isInWater = useCallback((position: Vector3) => {
+    if (levelConfig.id === 4) {
+      const waterHeight = levelConfig.spawnHeight + 1.2; // Water is at 1.2 units above platform
+      return position.y < waterHeight;
+    }
+    return false;
+  }, [levelConfig]);
+
   // Set up keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -126,7 +138,7 @@ export function Player() {
   // Set up mouse controls for camera
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement === document.body && !isGameComplete && health > 0) {
+      if (document.pointerLockElement === document.body && health > 0) {
         // Update camera angles
         cameraAngleHorizontal.current += e.movementX * MOUSE_SENSITIVITY;
         // Start at π/2 (behind character) and constrain between 15 and 180 degrees
@@ -143,7 +155,7 @@ export function Player() {
     };
 
     const handleClick = () => {
-      if (!isGameComplete && health > 0 && document.pointerLockElement !== document.body) {
+      if (health > 0 && document.pointerLockElement !== document.body) {
         document.body.requestPointerLock();
       }
     };
@@ -155,7 +167,7 @@ export function Player() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.body.removeEventListener('click', handleClick);
     };
-  }, [isGameComplete, health]);
+  }, [health]);
   
   // Release cursor when game is complete or health is 0
   useEffect(() => {
@@ -170,7 +182,7 @@ export function Player() {
   }, []);
   
   useFrame((state, delta) => {
-    if (health <= 0 || isGameFailed) return;
+    if (health <= 0) return;  // Only check for health, remove isGameFailed check
 
     if (!rigidBodyRef.current) return;
 
@@ -178,6 +190,9 @@ export function Player() {
     const currentVel = rigidBodyRef.current.linvel();
     
     currentVelocity.current.set(currentVel.x, currentVel.y, currentVel.z);
+
+    // Check if in water
+    const playerInWater = isInWater(new Vector3(worldPosition.x, worldPosition.y, worldPosition.z));
 
     // Reset jump when grounded (using a stricter threshold)
     const isGrounded = Math.abs(currentVel.y) < 0.05;
@@ -192,6 +207,16 @@ export function Player() {
         setEndlessFall(false);
       }
 
+      // Impact detection (only when not in water and falling faster than safe velocity)
+      if (!playerInWater && !isGameComplete && prevVelocity.current < SAFE_FALL_VELOCITY) {
+        const impactVelocity = Math.abs(prevVelocity.current);
+        const damage = Math.floor((impactVelocity - Math.abs(SAFE_FALL_VELOCITY)) * 2);
+        if (damage > 0) {
+          takeDamage(damage);
+          playDamageSound();
+        }
+      }
+
       // If on a moving platform, inherit its velocity
       if (levelConfig.platformMovement) {
         const { speed, direction } = levelConfig.platformMovement;
@@ -199,156 +224,121 @@ export function Player() {
         currentVelocity.current.add(platformVelocity);
       }
     } else {
-      // Update fall time when in air
+      // Update fall time when not grounded
       fallTimeRef.current += delta;
       setFallTime(fallTimeRef.current);
-      
-      // Check for endless fall
-      if (fallTimeRef.current >= ENDLESS_FALL_TIME && !isEndlessFall) {
+      if (!isEndlessFall && fallTimeRef.current > ENDLESS_FALL_TIME) {
         setEndlessFall(true);
       }
+    }
 
-      // Apply wind force when airborne
-      if (windEnabled && windStrength > 0) {
-        const effectiveWindStrength = windStrength;
-        
-        // Create wind force vector
-        const windForce = windDirection.clone().multiplyScalar(effectiveWindStrength * delta);
-        
-        // Apply wind force to current velocity
-        currentVelocity.current.add(windForce);
-        
-        // Apply the wind-affected velocity to the rigid body
-        rigidBodyRef.current.setLinvel(
-          { 
-            x: currentVelocity.current.x, 
-            y: currentVelocity.current.y, 
-            z: currentVelocity.current.z 
-          }, 
+    // Movement and physics updates only if game isn't failed
+    if (!isGameFailed) {
+      // World loop
+      if (worldPosition.y <= WORLD_BOTTOM) {
+        rigidBodyRef.current.setTranslation(
+          { x: worldPosition.x, y: WORLD_HEIGHT, z: worldPosition.z },
           true
         );
-      }
-    }
-
-    // Impact detection
-    const currentVerticalVel = currentVel.y;
-    if (!isGameComplete && prevVelocity.current < -10 && Math.abs(currentVerticalVel) < 1) {
-      const impactVelocity = Math.abs(prevVelocity.current);
-      const damage = Math.floor(impactVelocity * 2);
-      takeDamage(damage);
-      playDamageSound();
-    }
-    prevVelocity.current = currentVerticalVel;
-
-    // World loop
-    if (worldPosition.y <= WORLD_BOTTOM) {
-      rigidBodyRef.current.setTranslation(
-        { x: worldPosition.x, y: WORLD_HEIGHT, z: worldPosition.z },
-        true
-      );
-      // Preserve horizontal velocity but maintain vertical velocity for continuous acceleration
-      rigidBodyRef.current.setLinvel({ 
-        x: currentVel.x, 
-        y: verticalVelocity.current, 
-        z: currentVel.z 
-      }, true);
-    }
-
-    // Start with current velocity instead of resetting to zero
-    velocity.current.copy(currentVelocity.current);
-
-    // Apply gravity when in air
-    if (!isGrounded) {
-      // Apply gravity to vertical velocity
-      verticalVelocity.current = Math.max(
-        TERMINAL_VELOCITY,
-        verticalVelocity.current - GRAVITY * delta
-      );
-    }
-
-    // Calculate air control factor - now a fixed percentage
-    const airControlFactor = isGrounded ? 1 : AIR_CONTROL;
-
-    // Movement
-    if (!isGameComplete) {
-      // Calculate target movement direction
-      const moveDirection = new Vector3(0, 0, 0);
-      
-      // Handle jumping - only when grounded and legs aren't broken
-      if (keysPressed.current['Space'] && canJump.current && isGrounded && hasLegsEnabled) {
-        verticalVelocity.current = JUMP_FORCE;
-        canJump.current = false;
+        rigidBodyRef.current.setLinvel({ 
+          x: currentVel.x, 
+          y: verticalVelocity.current, 
+          z: currentVel.z 
+        }, true);
       }
 
-      // Only allow movement if legs are enabled
-      if (hasLegsEnabled) {
-        if (keysPressed.current['KeyW']) moveDirection.z -= 1;
-        if (keysPressed.current['KeyS']) moveDirection.z += 1;
-        if (keysPressed.current['KeyD']) moveDirection.x += 1;
-        if (keysPressed.current['KeyA']) moveDirection.x -= 1;
+      // Start with current velocity instead of resetting to zero
+      velocity.current.copy(currentVelocity.current);
+
+      // Apply gravity when in air (reduced in water)
+      if (!isGrounded) {
+        const gravityMultiplier = playerInWater ? 0.2 : 1;
+        verticalVelocity.current = Math.max(
+          TERMINAL_VELOCITY * (playerInWater ? 0.2 : 1),
+          verticalVelocity.current - GRAVITY * gravityMultiplier * delta
+        );
       }
-      
-      if (moveDirection.lengthSq() > 0) {
-        moveDirection.normalize();
-        moveDirection.applyQuaternion(movementQuaternion.current);
-        moveDirection.y = 0; // Ensure movement doesn't affect vertical velocity
+
+      // Calculate air/water control factor
+      const movementFactor = isGrounded ? 1 : (playerInWater ? 0.4 : AIR_CONTROL);
+
+      // Movement
+      if (!isGameComplete) {
+        const moveDirection = new Vector3(0, 0, 0);
         
-        // Determine target speed
-        let currentSpeed = MOVEMENT_SPEED;
-        if (keysPressed.current['ShiftLeft']) {
-          currentSpeed = RUNNING_SPEED;
-        } else if (keysPressed.current['ControlLeft']) {
-          currentSpeed = SPRINTING_SPEED;
+        // Handle jumping - only when grounded or in water, and legs aren't broken
+        if (keysPressed.current['Space'] && hasLegsEnabled && (canJump.current || playerInWater)) {
+          verticalVelocity.current = JUMP_FORCE * (playerInWater ? 0.3 : 1);
+          canJump.current = false;
         }
 
-        // Set target velocity (horizontal only)
-        targetVelocity.current.copy(moveDirection).multiplyScalar(currentSpeed);
-      } else {
-        // No input, so target zero velocity (horizontal only)
-        targetVelocity.current.set(0, 0, 0);
-      }
-
-      // Smoothly interpolate current velocity towards target (horizontal only)
-      if (isGrounded) {
-        const acceleration = moveDirection.lengthSq() > 0 ? ACCELERATION : DECELERATION;
-        velocity.current.x = THREE.MathUtils.lerp(
-          velocity.current.x,
-          targetVelocity.current.x,
-          1 - Math.exp(-acceleration * delta)
-        );
-        velocity.current.z = THREE.MathUtils.lerp(
-          velocity.current.z,
-          targetVelocity.current.z,
-          1 - Math.exp(-acceleration * delta)
-        );
-      } else {
-        // In air, add to existing velocity with fixed air control
-        const airVelocity = targetVelocity.current.clone().multiplyScalar(airControlFactor * delta);
-        velocity.current.x += airVelocity.x;
-        velocity.current.z += airVelocity.z;
-        
-        // Clamp horizontal velocity in air to a percentage of normal speed
-        const horizontalVel = new Vector3(velocity.current.x, 0, velocity.current.z);
-        const maxAirSpeed = MOVEMENT_SPEED * 0.8; // Reduced from 1.5 to 0.8 for slower air movement
-        if (horizontalVel.length() > maxAirSpeed) {
-          horizontalVel.normalize().multiplyScalar(maxAirSpeed);
-          velocity.current.x = horizontalVel.x;
-          velocity.current.z = horizontalVel.z;
+        // Only allow movement if legs are enabled
+        if (hasLegsEnabled) {
+          if (keysPressed.current['KeyW']) moveDirection.z -= 1;
+          if (keysPressed.current['KeyS']) moveDirection.z += 1;
+          if (keysPressed.current['KeyD']) moveDirection.x += 1;
+          if (keysPressed.current['KeyA']) moveDirection.x -= 1;
         }
-      }
+        
+        if (moveDirection.lengthSq() > 0) {
+          moveDirection.normalize();
+          moveDirection.applyQuaternion(movementQuaternion.current);
+          moveDirection.y = 0;
+          
+          let currentSpeed = MOVEMENT_SPEED;
+          if (keysPressed.current['ShiftLeft']) {
+            currentSpeed = RUNNING_SPEED;
+          } else if (keysPressed.current['ControlLeft']) {
+            currentSpeed = SPRINTING_SPEED;
+          }
+          
+          if (playerInWater) {
+            currentSpeed *= 0.4;
+          }
 
-      // Apply vertical velocity separately
-      velocity.current.y = verticalVelocity.current;
-      
-      // Apply final velocity
-      rigidBodyRef.current.setLinvel(velocity.current, true);
+          targetVelocity.current.copy(moveDirection).multiplyScalar(currentSpeed);
+        } else {
+          targetVelocity.current.set(0, 0, 0);
+        }
+
+        // Apply water resistance
+        if (playerInWater) {
+          currentVelocity.current.multiplyScalar(0.92);
+        }
+
+        // Velocity interpolation
+        if (isGrounded || playerInWater) {
+          const acceleration = moveDirection.lengthSq() > 0 ? ACCELERATION : DECELERATION;
+          velocity.current.x = THREE.MathUtils.lerp(
+            velocity.current.x,
+            targetVelocity.current.x,
+            1 - Math.exp(-acceleration * (playerInWater ? 0.7 : 1) * delta)
+          );
+          velocity.current.z = THREE.MathUtils.lerp(
+            velocity.current.z,
+            targetVelocity.current.z,
+            1 - Math.exp(-acceleration * (playerInWater ? 0.7 : 1) * delta)
+          );
+        } else {
+          const airVelocity = targetVelocity.current.clone().multiplyScalar(movementFactor * delta);
+          velocity.current.x += airVelocity.x;
+          velocity.current.z += airVelocity.z;
+        }
+
+        // Apply vertical velocity
+        velocity.current.y = verticalVelocity.current;
+        
+        // Apply final velocity
+        rigidBodyRef.current.setLinvel(velocity.current, true);
+      }
     }
 
+    // Camera updates always happen, even when game is failed
     // Update target position for smooth camera follow
     targetPosition.current.set(worldPosition.x, worldPosition.y, worldPosition.z);
     
     // Smoothly update camera position without physics influence
-    const cameraSpeed = isGrounded ? 0.15 : 0.05; // Slower follow when in air for stability
+    const cameraSpeed = isGrounded ? 0.15 : 0.05;
     cameraPosition.current.lerp(targetPosition.current, cameraSpeed);
 
     // Update camera position using spherical coordinates

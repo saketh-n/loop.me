@@ -5,6 +5,8 @@ import { useLoader, useFrame } from '@react-three/fiber';
 import { Sky, Stars } from '@react-three/drei';
 import { InteractiveGrass } from './InteractiveGrass';
 import { WindParticles } from './WindParticles';
+import { Water } from './Water';
+import { WaterfallParticles } from './WaterfallParticles';
 import { useGameStore } from '../store/gameStore';
 import { CuboidCollider } from '@react-three/rapier';
 import { useRef, useState, useEffect } from 'react';
@@ -184,55 +186,93 @@ export function GameScene() {
 
     // Regular non-collapsing platform
     return (
-      <RigidBody type="fixed" position={basePosition}>
-        <CuboidCollider 
-          args={[
-            levelConfig.platformDimensions[0] * 0.5,
-            0.5,
-            levelConfig.platformDimensions[1] * 0.5
-          ]} 
-        />
-        <group>
-          <mesh position={[0, 0, 0]}>
-            <boxGeometry args={[levelConfig.platformDimensions[0], 1, levelConfig.platformDimensions[1]]} />
-            <meshStandardMaterial 
-              map={soilTexture}
-              color={soilTexture ? '#ffffff' : '#8B4513'}
-              roughness={0.9}
-              metalness={0}
-            />
-          </mesh>
+      <>
+        <RigidBody type="fixed" position={basePosition}>
+          <CuboidCollider 
+            args={[
+              levelConfig.platformDimensions[0] * 0.5,
+              0.5,
+              levelConfig.platformDimensions[1] * 0.5
+            ]} 
+          />
+          <group>
+            <mesh position={[0, 0, 0]}>
+              <boxGeometry args={[levelConfig.platformDimensions[0], 1, levelConfig.platformDimensions[1]]} />
+              <meshStandardMaterial 
+                map={levelConfig.id !== 4 ? soilTexture : null}
+                color={levelConfig.id === 4 ? '#ffffff' : (soilTexture ? '#ffffff' : '#8B4513')}
+                roughness={0.9}
+                metalness={0}
+              />
+            </mesh>
 
-          {levelConfig.grass.enabled && (
-            <>
-              <mesh position={[0, 0.501, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[levelConfig.platformDimensions[0], levelConfig.platformDimensions[1]]} />
-                <meshStandardMaterial 
-                  map={grassTexture}
-                  color={grassTexture ? '#ffffff' : '#228B22'}
-                  transparent={true}
-                  alphaTest={0.5}
-                  depthWrite={true}
-                  side={DoubleSide}
-                  roughness={1}
+            {/* Center pole for Level 4 */}
+            {levelConfig.id === 4 && (
+              <mesh position={[0, 5.5, 0]}>
+                <boxGeometry args={[0.5, 10, 0.5]} />
+                <meshStandardMaterial
+                  color="#ffffff"
+                  roughness={0.9}
                   metalness={0}
                 />
               </mesh>
+            )}
 
-              <InteractiveGrass 
-                key={`grass-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
-                position={[0, 0.5, 0]}
-                count={Math.floor(levelConfig.platformDimensions[0] * levelConfig.platformDimensions[1] * levelConfig.grass.density)}
-                bounds={[
-                  levelConfig.platformDimensions[0],
-                  levelConfig.platformDimensions[1]
-                ]}
-                height={0.4}
+            {levelConfig.grass.enabled && (
+              <>
+                <mesh position={[0, 0.501, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <planeGeometry args={[levelConfig.platformDimensions[0], levelConfig.platformDimensions[1]]} />
+                  <meshStandardMaterial 
+                    map={grassTexture}
+                    color={grassTexture ? '#ffffff' : '#228B22'}
+                    transparent={true}
+                    alphaTest={0.5}
+                    depthWrite={true}
+                    side={DoubleSide}
+                    roughness={1}
+                    metalness={0}
+                  />
+                </mesh>
+
+                <InteractiveGrass 
+                  key={`grass-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
+                  position={[0, 0.5, 0]}
+                  count={Math.floor(levelConfig.platformDimensions[0] * levelConfig.platformDimensions[1] * levelConfig.grass.density)}
+                  bounds={[
+                    levelConfig.platformDimensions[0],
+                    levelConfig.platformDimensions[1]
+                  ]}
+                  height={0.4}
+                />
+              </>
+            )}
+          </group>
+        </RigidBody>
+
+        {/* Water volume - completely separate from physics */}
+        {levelConfig.id === 4 && (
+          <group>
+            <mesh 
+              position={[0, levelConfig.spawnHeight + 0.6, 0]}
+              key="water-main"
+            >
+              <boxGeometry 
+                args={[
+                  levelConfig.platformDimensions[0] + 1, 
+                  1.2,  // knee height
+                  levelConfig.platformDimensions[1] + 1
+                ]} 
               />
-            </>
-          )}
-        </group>
-      </RigidBody>
+              <meshStandardMaterial 
+                color="#4a6d8c" 
+                transparent 
+                opacity={0.6}
+                side={DoubleSide}
+              />
+            </mesh>
+          </group>
+        )}
+      </>
     );
   };
 
@@ -256,7 +296,7 @@ export function GameScene() {
   console.log('Platform Dimensions:', levelConfig.platformDimensions);
 
   return (
-    <Physics debug={false}>
+    <Physics debug={true}>
       {/* Lights */}
       <ambientLight intensity={isNight ? 0.1 : 0.8} />
       {/* Moon light for night time */}
@@ -307,25 +347,29 @@ export function GameScene() {
       {levelConfig.wind.enabled && <WindParticles />}
 
       {/* Main Platform (Physical) */}
-      <RigidBody 
-        type={levelConfig.platformMovement ? "kinematicPosition" : "fixed"}
-        ref={platformRef}
-        position={[0, levelConfig.spawnHeight, 0]}
-        key={`platform-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
-      >
-        <CuboidCollider 
-          key={`collider-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
-          args={[
-            levelConfig.platformDimensions[0] * 0.5,
-            0.5,
-            levelConfig.platformDimensions[1] * 0.5
-          ]} 
-        />
-        {createPlatform([0, 0, 0])}
-      </RigidBody>
+      {!levelConfig.collapse?.enabled ? (
+        <RigidBody 
+          type={levelConfig.platformMovement ? "kinematicPosition" : "fixed"}
+          ref={platformRef}
+          position={[0, levelConfig.spawnHeight, 0]}
+          key={`platform-rigid-${levelConfig.id}`}
+        >
+          <CuboidCollider 
+            key={`collider-${levelConfig.platformDimensions[0]}-${levelConfig.platformDimensions[1]}`}
+            args={[
+              levelConfig.platformDimensions[0] * 0.5,
+              0.5,
+              levelConfig.platformDimensions[1] * 0.5
+            ]} 
+          />
+          {createPlatform([0, 0, 0])}
+        </RigidBody>
+      ) : (
+        createPlatform([0, levelConfig.spawnHeight, 0])
+      )}
 
       {/* Visual Mirror Platforms */}
-      <group>
+      <group key={`mirrors-${levelConfig.id}`}>
         {/* Platform Above */}
         {createPlatform([0, levelConfig.spawnHeight + 100, 0])}
 

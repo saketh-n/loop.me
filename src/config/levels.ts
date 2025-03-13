@@ -112,8 +112,31 @@ export const levels: LevelConfig[] = [
     },
     collapse: {
       enabled: true,
-      segments: 4,  // Platform will collapse in 5 parts
-      intervalSeconds: 2  // One segment collapses every 3 seconds
+      segments: 4,  // Platform will collapse in 4 parts
+      intervalSeconds: 2  // One segment collapses every 2 seconds
+    }
+  },
+  {
+    id: 4,
+    name: "Dawn Platform",
+    description: "A simple platform at dawn",
+    platformDimensions: [20, 20],
+    spawnHeight: 50,
+    spawnOffset: [-5, -5],  // Center of top left quadrant (1/4 of the width/depth from center)
+    wind: {
+      enabled: false,
+      direction: new Vector3(0, 0, 0),
+      strength: 0,
+      gustStrength: 0
+    },
+    skybox: {
+      timeOfDay: 'sunrise',
+      inclination: 0.2,  // Lower inclination for dawn
+      azimuth: 0.15
+    },
+    grass: {
+      enabled: false,
+      density: 0
     }
   }
 ]; 

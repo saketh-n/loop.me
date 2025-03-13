@@ -11,6 +11,7 @@ export function GameUI() {
   const isEndlessFall = useGameStore((state) => state.isEndlessFall);
   const nextLevel = useGameStore((state) => state.nextLevel);
   const currentLevel = useGameStore((state) => state.currentLevel);
+  const takeDamage = useGameStore((state) => state.takeDamage);
   const [showInstructions, setShowInstructions] = useState(true);
   const [showDamageFlash, setShowDamageFlash] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(true);
@@ -36,11 +37,15 @@ export function GameUI() {
       if (e.key.toLowerCase() === 'x') {
         setShowInstructions(prev => !prev);
       }
+      // Testing shortcut - instant win current level
+      if (e.key.toLowerCase() === 'l') {
+        takeDamage(health); // Take damage equal to current health to reach 0
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [health, takeDamage]);
 
   const handleRestart = () => {
     window.location.reload();
