@@ -2,7 +2,9 @@ import { useFrame } from '@react-three/fiber';
 import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { Vector3, Euler, Matrix4, Quaternion } from 'three';
 import { useGameStore } from '../store/gameStore';
-import { RigidBody } from '@react-three/rapier';
+import { RigidBody, CuboidCollider } from '@react-three/rapier';
+import type { RigidBody as RigidBodyType } from '@dimforge/rapier3d-compat';
+import type { CollisionEnterPayload, CollisionExitPayload } from '@react-three/rapier';
 import { Character } from './Character';
 import * as THREE from 'three';
 
@@ -57,8 +59,15 @@ const playDamageSound = () => {
   damageSound.play().catch(console.error); // Catch any autoplay issues
 };
 
+// Add water physics constants
+const WATER_RESISTANCE = 0.85; // Stronger resistance in water (was 0.92)
+const WATER_MOVEMENT_FACTOR = 0.25; // Reduced movement speed in water (was 0.4)
+const WATER_JUMP_FORCE_MULTIPLIER = 1.0; // Normal jump force in water
+const WATER_CURRENT_SPEED = 3.0; // Speed of water current
+const WATER_CURRENT_DIRECTION = new Vector3(1, 0, 0); // Current flows in +X direction
+
 export function Player() {
-  const rigidBodyRef = useRef<any>(null);
+  const rigidBodyRef = useRef<RigidBodyType>(null);
   const velocity = useRef(new Vector3());
   const verticalVelocity = useRef(0);
   const cameraRotation = useRef(new Euler(0, 0, 0));
@@ -115,6 +124,8 @@ export function Player() {
     }
     return false;
   }, [levelConfig]);
+
+  const isInWaterSensor = useRef(false);
 
   // Set up keyboard controls
   useEffect(() => {
@@ -181,6 +192,27 @@ export function Player() {
     cameraAngleVertical.current = Math.PI / 2; // 90 degrees - directly behind
   }, []);
   
+  const handleCollisionEnter = useCallback((payload: CollisionEnterPayload) => {
+    if (payload.other.collider.isSensor) {
+      isInWaterSensor.current = true;
+    }
+  }, []);
+
+  const handleCollisionExit = useCallback((payload: CollisionExitPayload) => {
+    if (payload.other.collider.isSensor) {
+      isInWaterSensor.current = false;
+    }
+  }, []);
+
+  // Add collision event handlers
+  useEffect(() => {
+    if (!rigidBodyRef.current) return;
+
+    // Lock rotations
+    rigidBodyRef.current.setEnabled(true);
+    rigidBodyRef.current.setEnabledRotations(false, false, false, true);
+  }, []);
+  
   useFrame((state, delta) => {
     if (health <= 0) return;  // Only check for health, remove isGameFailed check
 
@@ -191,8 +223,14 @@ export function Player() {
     
     currentVelocity.current.set(currentVel.x, currentVel.y, currentVel.z);
 
-    // Check if in water
-    const playerInWater = isInWater(new Vector3(worldPosition.x, worldPosition.y, worldPosition.z));
+    // Check if in water using sensor
+    const playerInWater = isInWaterSensor.current;
+
+    // Apply water current in Level 4
+    if (playerInWater && levelConfig.id === 4) {
+      const currentForce = WATER_CURRENT_DIRECTION.clone().multiplyScalar(WATER_CURRENT_SPEED * delta);
+      currentVelocity.current.add(currentForce);
+    }
 
     // Reset jump when grounded (using a stricter threshold)
     const isGrounded = Math.abs(currentVel.y) < 0.05;
@@ -266,10 +304,17 @@ export function Player() {
       if (!isGameComplete) {
         const moveDirection = new Vector3(0, 0, 0);
         
-        // Handle jumping - only when grounded or in water, and legs aren't broken
-        if (keysPressed.current['Space'] && hasLegsEnabled && (canJump.current || playerInWater)) {
-          verticalVelocity.current = JUMP_FORCE * (playerInWater ? 0.3 : 1);
-          canJump.current = false;
+        // Handle jumping - allow continuous jumping in water with no cooldown
+        if (keysPressed.current['Space'] && hasLegsEnabled) {
+          if (playerInWater && canJump.current) {
+            // Normal jump in water
+            verticalVelocity.current = JUMP_FORCE * WATER_JUMP_FORCE_MULTIPLIER;
+            canJump.current = false;
+          } else if (canJump.current) {
+            // Normal jump on ground
+            verticalVelocity.current = JUMP_FORCE;
+            canJump.current = false;
+          }
         }
 
         // Only allow movement if legs are enabled
@@ -295,15 +340,15 @@ export function Player() {
           if (playerInWater) {
             currentSpeed *= 0.4;
           }
+          
+          if (playerInWater) {
+            currentVelocity.current.multiplyScalar(WATER_RESISTANCE);
+            currentSpeed *= WATER_MOVEMENT_FACTOR / 0.4; // Adjust for the previous water speed modification
+          }
 
           targetVelocity.current.copy(moveDirection).multiplyScalar(currentSpeed);
         } else {
           targetVelocity.current.set(0, 0, 0);
-        }
-
-        // Apply water resistance
-        if (playerInWater) {
-          currentVelocity.current.multiplyScalar(0.92);
         }
 
         // Velocity interpolation
@@ -380,6 +425,8 @@ export function Player() {
         angularDamping={0.5}
         enabledRotations={[false, false, false]}
         ccd={true}
+        onCollisionEnter={handleCollisionEnter}
+        onCollisionExit={handleCollisionExit}
       >
         <Character position={[0, 0, 0]} velocity={currentVelocity.current} />
       </RigidBody>

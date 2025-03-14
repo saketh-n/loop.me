@@ -252,6 +252,7 @@ export function GameScene() {
         {/* Water volume - completely separate from physics */}
         {levelConfig.id === 4 && (
           <group>
+            {/* Visual water mesh */}
             <mesh 
               position={[0, levelConfig.spawnHeight + 0.6, 0]}
               key="water-main"
@@ -270,6 +271,25 @@ export function GameScene() {
                 side={DoubleSide}
               />
             </mesh>
+
+            {/* Water particles for visual effect */}
+            <WaterfallParticles 
+              position={[0, levelConfig.spawnHeight + 1.2, 0]}
+              width={levelConfig.platformDimensions[0] + 1}
+              height={1.2}
+            />
+
+            {/* Water physics sensor */}
+            <RigidBody type="fixed" sensor name="water_sensor">
+              <CuboidCollider 
+                args={[
+                  (levelConfig.platformDimensions[0] + 1) * 0.5,
+                  0.6,  // half height
+                  (levelConfig.platformDimensions[1] + 1) * 0.5
+                ]}
+                position={[0, levelConfig.spawnHeight + 0.6, 0]}
+              />
+            </RigidBody>
           </group>
         )}
       </>
@@ -375,6 +395,69 @@ export function GameScene() {
 
         {/* Platform Below */}
         {createPlatform([0, levelConfig.spawnHeight - 100, 0])}
+
+        {/* Water volumes for mirrored platforms in Level 4 */}
+        {levelConfig.id === 4 && (
+          <>
+            {/* Water Above */}
+            <group>
+              <mesh position={[0, levelConfig.spawnHeight + 100.6, 0]}>
+                <boxGeometry 
+                  args={[
+                    levelConfig.platformDimensions[0] + 1, 
+                    1.2,
+                    levelConfig.platformDimensions[1] + 1
+                  ]} 
+                />
+                <meshStandardMaterial 
+                  color="#4a6d8c" 
+                  transparent 
+                  opacity={0.6}
+                  side={DoubleSide}
+                />
+              </mesh>
+              <RigidBody type="fixed" sensor name="water_sensor">
+                <CuboidCollider 
+                  args={[
+                    (levelConfig.platformDimensions[0] + 1) * 0.5,
+                    0.6,
+                    (levelConfig.platformDimensions[1] + 1) * 0.5
+                  ]}
+                  position={[0, levelConfig.spawnHeight + 100.6, 0]}
+                />
+              </RigidBody>
+            </group>
+
+            {/* Water Below */}
+            <group>
+              <mesh position={[0, levelConfig.spawnHeight - 99.4, 0]}>
+                <boxGeometry 
+                  args={[
+                    levelConfig.platformDimensions[0] + 1, 
+                    1.2,
+                    levelConfig.platformDimensions[1] + 1
+                  ]} 
+                />
+                <meshStandardMaterial 
+                  color="#4a6d8c" 
+                  transparent 
+                  opacity={0.6}
+                  side={DoubleSide}
+                />
+              </mesh>
+              <RigidBody type="fixed" sensor name="water_sensor">
+                <CuboidCollider 
+                  args={[
+                    (levelConfig.platformDimensions[0] + 1) * 0.5,
+                    0.6,
+                    (levelConfig.platformDimensions[1] + 1) * 0.5
+                  ]}
+                  position={[0, levelConfig.spawnHeight - 99.4, 0]}
+                />
+              </RigidBody>
+            </group>
+          </>
+        )}
       </group>
 
       {/* Player */}
